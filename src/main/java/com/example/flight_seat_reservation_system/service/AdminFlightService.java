@@ -37,6 +37,9 @@ public class AdminFlightService {
 
     /**
      * Creates a new active flight and generates seats during creation.
+     *
+     * @param request flight creation payload
+     * @return created flight response with calculated seat availability
      */
     @Transactional
     public FlightResponse createFlight(CreateFlightRequest request) {
@@ -48,11 +51,13 @@ public class AdminFlightService {
         flight.setStatus(FlightStatus.ACTIVE);
 
         List<String> seatNumbers = seatNumberGenerator.generate(request.seatCount());
-        for (String seatNumber : seatNumbers) {
-            Seat seat = new Seat();
-            seat.setSeatNumber(seatNumber);
-            flight.addSeat(seat);
-        }
+        seatNumbers.stream()
+                .map(seatNumber -> {
+                    Seat seat = new Seat();
+                    seat.setSeatNumber(seatNumber);
+                    return seat;
+                })
+                .forEach(flight::addSeat);
 
         Flight saved = flightRepository.save(flight);
         return flightMapper.toResponse(saved, saved.getSeats().size(), saved.getSeats().size());
@@ -60,6 +65,9 @@ public class AdminFlightService {
 
     /**
      * Soft-removes a flight. Existing records remain for history.
+     *
+     * @param flightId flight identifier
+     * @throws NotFoundException if the flight does not exist
      */
     @Transactional
     public void removeFlight(Long flightId) {

@@ -28,6 +28,11 @@ public class FlightQueryService {
 
     /**
      * Returns active flights with computed seat availability while avoiding N+1 loading.
+     *
+     * @param date optional local departure date filter
+     * @param origin optional origin filter by airport code or city
+     * @param destination optional destination filter by airport code or city
+     * @return list wrapper containing flights matching provided filters
      */
     @Transactional(readOnly = true)
     public FlightSearchResponse searchFlights(LocalDate date, String origin, String destination) {

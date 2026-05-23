@@ -53,6 +53,12 @@ public class BookingService {
 
     /**
      * Creates a HELD booking if seat is available and booking window is still open.
+     *
+     * @param flightId flight identifier
+     * @param request booking creation payload
+     * @return created booking in HELD status
+     * @throws NotFoundException if flight or seat does not exist
+     * @throws ConflictException if flight is removed, booking window is closed, or seat is unavailable
      */
     @Transactional
     public BookingResponse createBooking(Long flightId, CreateBookingRequest request) {
@@ -78,14 +84,18 @@ public class BookingService {
                 List.of(BookingStatus.HELD, BookingStatus.CONFIRMED)
         );
 
-        for (Booking active : activeBookings) {
-            if (active.getStatus() == BookingStatus.CONFIRMED) {
-                throw new ConflictException("Seat is already confirmed");
-            }
-            if (active.getStatus() == BookingStatus.HELD && active.getHoldExpiresAt() != null
-                    && active.getHoldExpiresAt().isAfter(now)) {
-                throw new ConflictException("Seat is already held");
-            }
+        boolean hasConfirmedBooking = activeBookings.stream()
+                .anyMatch(active -> active.getStatus() == BookingStatus.CONFIRMED);
+        if (hasConfirmedBooking) {
+            throw new ConflictException("Seat is already confirmed");
+        }
+
+        boolean hasActiveHeldBooking = activeBookings.stream()
+                .anyMatch(active -> active.getStatus() == BookingStatus.HELD
+                        && active.getHoldExpiresAt() != null
+                        && active.getHoldExpiresAt().isAfter(now));
+        if (hasActiveHeldBooking) {
+            throw new ConflictException("Seat is already held");
         }
 
         Booking booking = new Booking();
@@ -106,6 +116,11 @@ public class BookingService {
 
     /**
      * Confirms a HELD booking when the hold has not expired.
+     *
+     * @param bookingId booking identifier
+     * @return confirmed booking
+     * @throws NotFoundException if booking does not exist
+     * @throws ConflictException if flight is removed, booking is not HELD, or hold has expired
      */
     @Transactional
     public BookingResponse confirmBooking(Long bookingId) {
@@ -135,6 +150,10 @@ public class BookingService {
 
     /**
      * Cancels a HELD or CONFIRMED booking while preserving booking history.
+     *
+     * @param bookingId booking identifier
+     * @throws NotFoundException if booking does not exist
+     * @throws ConflictException if booking has expired or is already terminal
      */
     @Transactional
     public void cancelBooking(Long bookingId) {
@@ -158,6 +177,8 @@ public class BookingService {
 
     /**
      * Expires stale HELD bookings in batch.
+     *
+     * @return number of expired bookings
      */
     @Transactional
     public int expireHeldBookings() {
@@ -170,11 +191,9 @@ public class BookingService {
                 seatId,
                 List.of(BookingStatus.HELD)
         );
-        for (Booking booking : held) {
-            if (isExpired(booking, now)) {
-                booking.setStatus(BookingStatus.EXPIRED);
-            }
-        }
+        held.stream()
+                .filter(booking -> isExpired(booking, now))
+                .forEach(booking -> booking.setStatus(BookingStatus.EXPIRED));
     }
 
     private boolean isExpired(Booking booking, Instant now) {
