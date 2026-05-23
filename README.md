@@ -13,7 +13,7 @@ Core business behaviors:
 
 ## Tech Stack
 - Java 21
-- Spring Boot 3.5
+- Spring Boot 4.0.6
 - Spring Web
 - Spring Data JPA (`JpaRepository`)
 - PostgreSQL
@@ -55,7 +55,7 @@ mvn clean test
 ```
 
 Integration tests use Testcontainers with real PostgreSQL (no H2), so Docker must be available.
-If Docker is unavailable in the execution environment, the Testcontainers integration test class is skipped (`@Testcontainers(disabledWithoutDocker = true)`).
+If Docker is unavailable in the execution environment, Testcontainers integration test classes are skipped (`@Testcontainers(disabledWithoutDocker = true)`).
 
 ## Database Migrations
 Flyway scripts are in `src/main/resources/db/migration`:
@@ -82,6 +82,14 @@ This prevents double booking at database level for active reservations.
 - `DELETE /admin/flights/{id}`
 
 OpenAPI is generated via springdoc and available in Swagger UI.
+
+## Test Structure
+- Unit tests are organized by layer (`service`, `service.validation`, `controller`, `mapper`, `scheduler`).
+- Integration tests are split by API area:
+  - `AdminFlightsControllerIntegrationTest`
+  - `FlightsControllerIntegrationTest`
+  - `BookingsControllerIntegrationTest`
+- Shared integration setup and helpers are centralized in `AbstractIntegrationTest`.
 
 ## Design Decisions
 - Controllers are thin; services hold business logic.
