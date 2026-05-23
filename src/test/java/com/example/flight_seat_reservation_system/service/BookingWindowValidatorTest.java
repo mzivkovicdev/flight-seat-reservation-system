@@ -3,6 +3,8 @@ package com.example.flight_seat_reservation_system.service;
 import static org.instancio.Select.field;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -19,9 +21,8 @@ import com.example.flight_seat_reservation_system.service.validation.BookingWind
 class BookingWindowValidatorTest {
 
     @Test
-    void shouldAllowBookingBeforeCutoffUsingOriginTimezone() {
-        BookingProperties properties = new BookingProperties();
-        BookingWindowValidator validator = new BookingWindowValidator(properties);
+    void validateBookingAllowed() {
+        BookingWindowValidator validator = spy(new BookingWindowValidator(new BookingProperties()));
 
         String originTimezone = "Europe/Dublin";
         Flight flight = Instancio.of(Flight.class)
@@ -36,12 +37,12 @@ class BookingWindowValidatorTest {
                 .toInstant();
 
         assertDoesNotThrow(() -> validator.validateBookingAllowed(flight, now));
+        verify(validator).validateBookingAllowed(flight, now);
     }
 
     @Test
-    void shouldRejectBookingAtOrAfterCutoffUsingOriginTimezone() {
-        BookingProperties properties = new BookingProperties();
-        BookingWindowValidator validator = new BookingWindowValidator(properties);
+    void validateBookingAllowed_bookingWindowClosed() {
+        BookingWindowValidator validator = spy(new BookingWindowValidator(new BookingProperties()));
 
         String originTimezone = "Europe/Dublin";
         Flight flight = Instancio.of(Flight.class)
@@ -56,5 +57,6 @@ class BookingWindowValidatorTest {
                 .toInstant();
 
         assertThrows(ConflictException.class, () -> validator.validateBookingAllowed(flight, now));
+        verify(validator).validateBookingAllowed(flight, now);
     }
 }

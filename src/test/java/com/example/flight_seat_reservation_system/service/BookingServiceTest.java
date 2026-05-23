@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -19,7 +20,6 @@ import org.instancio.Instancio;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,15 +52,12 @@ class BookingServiceTest {
     @Mock
     private BookingWindowValidator bookingWindowValidator;
 
-    private BookingProperties bookingProperties;
-    private Clock fixedClock;
-
-    @InjectMocks
     private BookingService bookingService;
+    private Clock fixedClock;
 
     @BeforeEach
     void setUp() {
-        bookingProperties = new BookingProperties();
+        BookingProperties bookingProperties = new BookingProperties();
         fixedClock = Clock.fixed(Instant.parse("2026-06-01T10:00:00Z"), ZoneOffset.UTC);
         bookingService = new BookingService(
                 flightRepository,
@@ -74,7 +71,7 @@ class BookingServiceTest {
     }
 
     @Test
-    void shouldCreateHeldBooking() {
+    void createBooking() {
         Flight flight = activeFlight();
         Seat seat = seat(flight);
         Booking saved = Instancio.of(Booking.class)
@@ -97,10 +94,12 @@ class BookingServiceTest {
 
         assertEquals("HELD", response.status());
         verify(bookingWindowValidator).validateBookingAllowed(flight, fixedClock.instant());
+        verify(bookingRepository).saveAndFlush(any(Booking.class));
+        verifyNoMoreInteractions(bookingWindowValidator);
     }
 
     @Test
-    void shouldRejectBookingOnRemovedFlight() {
+    void createBooking_flightRemoved() {
         Flight flight = activeFlight();
         flight.setStatus(FlightStatus.REMOVED);
         when(flightRepository.findById(1L)).thenReturn(Optional.of(flight));
@@ -108,11 +107,13 @@ class BookingServiceTest {
         assertThrows(ConflictException.class,
                 () -> bookingService.createBooking(1L, createBookingRequest()));
 
+        verify(flightRepository).findById(1L);
         verify(seatRepository, never()).findByFlightIdAndSeatNumberForUpdate(any(), any());
+        verifyNoMoreInteractions(flightRepository);
     }
 
     @Test
-    void shouldRejectWhenSeatAlreadyHeld() {
+    void createBooking_seatAlreadyHeld() {
         Flight flight = activeFlight();
         Seat seat = seat(flight);
         Booking activeHold = Instancio.of(Booking.class)
@@ -129,10 +130,14 @@ class BookingServiceTest {
 
         assertThrows(ConflictException.class,
                 () -> bookingService.createBooking(1L, createBookingRequest()));
+
+        verify(bookingWindowValidator).validateBookingAllowed(flight, fixedClock.instant());
+        verify(bookingRepository, never()).saveAndFlush(any(Booking.class));
+        verifyNoMoreInteractions(bookingWindowValidator);
     }
 
     @Test
-    void shouldConfirmHeldBooking() {
+    void confirmBooking() {
         Flight flight = activeFlight();
         Booking booking = Instancio.of(Booking.class)
                 .set(field(Booking::getStatus), BookingStatus.HELD)
@@ -150,10 +155,12 @@ class BookingServiceTest {
 
         assertEquals("CONFIRMED", response.status());
         assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingMapper).toResponse(booking);
+        verifyNoMoreInteractions(bookingMapper);
     }
 
     @Test
-    void shouldFailToConfirmExpiredBooking() {
+    void confirmBooking_holdExpired() {
         Flight flight = activeFlight();
         Booking booking = Instancio.of(Booking.class)
                 .set(field(Booking::getStatus), BookingStatus.HELD)
@@ -165,10 +172,12 @@ class BookingServiceTest {
 
         assertThrows(ConflictException.class, () -> bookingService.confirmBooking(1L));
         assertEquals(BookingStatus.EXPIRED, booking.getStatus());
+        verify(bookingRepository).findByIdForUpdate(1L);
+        verifyNoMoreInteractions(bookingRepository);
     }
 
     @Test
-    void shouldCancelConfirmedBooking() {
+    void cancelBooking() {
         Flight flight = activeFlight();
         Booking booking = Instancio.of(Booking.class)
                 .set(field(Booking::getStatus), BookingStatus.CONFIRMED)
@@ -180,6 +189,19 @@ class BookingServiceTest {
         bookingService.cancelBooking(1L);
 
         assertEquals(BookingStatus.CANCELLED, booking.getStatus());
+        verify(bookingRepository).findByIdForUpdate(1L);
+        verifyNoMoreInteractions(bookingRepository);
+    }
+
+    @Test
+    void expireHeldBookings() {
+        when(bookingRepository.expireHeldBookings(fixedClock.instant())).thenReturn(5);
+
+        int expired = bookingService.expireHeldBookings();
+
+        assertEquals(5, expired);
+        verify(bookingRepository).expireHeldBookings(fixedClock.instant());
+        verifyNoMoreInteractions(bookingRepository);
     }
 
     private Flight activeFlight() {

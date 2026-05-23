@@ -3,6 +3,8 @@ package com.example.flight_seat_reservation_system.mapper;
 import static org.instancio.Select.field;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
@@ -15,10 +17,10 @@ import com.example.flight_seat_reservation_system.entity.Seat;
 
 class BookingMapperTest {
 
-    private final BookingMapper mapper = Mappers.getMapper(BookingMapper.class);
-
     @Test
-    void shouldMapNestedFields() {
+    void toResponse() {
+        BookingMapper mapper = spy(Mappers.getMapper(BookingMapper.class));
+
         Long flightId = Instancio.create(Long.class);
         String flightNumber = "FL-" + Instancio.create(Integer.class);
         String seatNumber = "2C";
@@ -46,5 +48,6 @@ class BookingMapperTest {
         assertEquals(flightNumber, response.flightNumber());
         assertEquals(seatNumber, response.seatNumber());
         assertEquals(status.name(), response.status());
+        verify(mapper).toResponse(booking);
     }
 }
