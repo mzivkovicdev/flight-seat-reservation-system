@@ -1,4 +1,4 @@
-package com.example.flight_seat_reservation_system.service;
+package com.example.flight_seat_reservation_system.service.validation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -8,8 +8,6 @@ import static org.mockito.Mockito.verify;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-
-import com.example.flight_seat_reservation_system.service.validation.SeatNumberGenerator;
 
 class SeatNumberGeneratorTest {
 

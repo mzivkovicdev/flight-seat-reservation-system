@@ -1,4 +1,4 @@
-package com.example.flight_seat_reservation_system.service;
+package com.example.flight_seat_reservation_system.service.validation;
 
 import static org.instancio.Select.field;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import com.example.flight_seat_reservation_system.config.BookingProperties;
 import com.example.flight_seat_reservation_system.entity.Flight;
 import com.example.flight_seat_reservation_system.exception.ConflictException;
-import com.example.flight_seat_reservation_system.service.validation.BookingWindowValidator;
 
 class BookingWindowValidatorTest {
 
