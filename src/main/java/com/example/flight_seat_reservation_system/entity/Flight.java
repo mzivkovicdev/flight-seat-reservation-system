@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -74,6 +75,27 @@ public class Flight {
 
     @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Seat> seats = new ArrayList<>();
+
+    public Flight() {
+    }
+
+    public Flight(String flightNumber, String originAirportCode, String originCity, String originTimezone,
+                  String destinationAirportCode, String destinationCity, String destinationTimezone,
+                  Instant departureTimeUtc, LocalDateTime departureTimeLocal, LocalDate departureDateLocal,
+                  FlightStatus status, List<Seat> seats) {
+        this.flightNumber = flightNumber;
+        this.originAirportCode = originAirportCode;
+        this.originCity = originCity;
+        this.originTimezone = originTimezone;
+        this.destinationAirportCode = destinationAirportCode;
+        this.destinationCity = destinationCity;
+        this.destinationTimezone = destinationTimezone;
+        this.departureTimeUtc = departureTimeUtc;
+        this.departureTimeLocal = departureTimeLocal;
+        this.departureDateLocal = departureDateLocal;
+        this.status = status;
+        this.seats = seats != null ? seats : new ArrayList<>();
+    }
 
     @PrePersist
     public void prePersist() {
@@ -218,5 +240,43 @@ public class Flight {
 
     public void setSeats(List<Seat> seats) {
         this.seats = seats;
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Flight)) {
+            return false;
+        }
+        Flight flight = (Flight) o;
+        return id != null && Objects.equals(id, flight.id);
+    }
+
+    @Override
+    public final int hashCode() {
+        return getClass().hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "Flight{" +
+                "id=" + id +
+                ", flightNumber='" + flightNumber + '\'' +
+                ", originAirportCode='" + originAirportCode + '\'' +
+                ", originCity='" + originCity + '\'' +
+                ", originTimezone='" + originTimezone + '\'' +
+                ", destinationAirportCode='" + destinationAirportCode + '\'' +
+                ", destinationCity='" + destinationCity + '\'' +
+                ", destinationTimezone='" + destinationTimezone + '\'' +
+                ", departureTimeUtc=" + departureTimeUtc +
+                ", departureTimeLocal=" + departureTimeLocal +
+                ", departureDateLocal=" + departureDateLocal +
+                ", status=" + status +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                ", version=" + version +
+                '}';
     }
 }

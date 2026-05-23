@@ -1,6 +1,7 @@
 package com.example.flight_seat_reservation_system.entity;
 
 import java.time.Instant;
+import java.util.Objects;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -61,6 +62,21 @@ public class Booking {
     @Version
     @Column(nullable = false)
     private Long version;
+
+    public Booking() {
+    }
+
+    public Booking(Flight flight, Seat seat, String passengerName, String passengerEmail,
+                   BookingStatus status, Instant holdExpiresAt, Instant confirmedAt, Instant cancelledAt) {
+        this.flight = flight;
+        this.seat = seat;
+        this.passengerName = passengerName;
+        this.passengerEmail = passengerEmail;
+        this.status = status;
+        this.holdExpiresAt = holdExpiresAt;
+        this.confirmedAt = confirmedAt;
+        this.cancelledAt = cancelledAt;
+    }
 
     @PrePersist
     public void prePersist() {
@@ -168,5 +184,40 @@ public class Booking {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Booking)) {
+            return false;
+        }
+        Booking booking = (Booking) o;
+        return id != null && Objects.equals(id, booking.id);
+    }
+
+    @Override
+    public final int hashCode() {
+        return getClass().hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "Booking{" +
+                "id=" + id +
+                ", flightId=" + (flight != null ? flight.getId() : null) +
+                ", seatId=" + (seat != null ? seat.getId() : null) +
+                ", passengerName='" + passengerName + '\'' +
+                ", passengerEmail='" + passengerEmail + '\'' +
+                ", status=" + status +
+                ", holdExpiresAt=" + holdExpiresAt +
+                ", confirmedAt=" + confirmedAt +
+                ", cancelledAt=" + cancelledAt +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
+                ", version=" + version +
+                '}';
     }
 }
