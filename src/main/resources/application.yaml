@@ -1,3 +1,31 @@
 spring:
   application:
     name: flight-seat-reservation-system
+  datasource:
+    url: jdbc:postgresql://localhost:5432/flight_reservation
+    username: postgres
+    password: postgres
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+  flyway:
+    enabled: true
+
+server:
+  error:
+    include-message: never
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+booking:
+  hold-duration: PT10M
+  cutoff-duration: PT45M
+  expiration-cleanup-delay: PT1M

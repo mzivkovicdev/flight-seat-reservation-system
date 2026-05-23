@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+booking:
+  hold-duration: PT2M
+  cutoff-duration: PT45M
+  expiration-cleanup-delay: PT10M
