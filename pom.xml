@@ -22,6 +22,7 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <testcontainers.version>1.21.0</testcontainers.version>
         <springdoc.version>2.8.8</springdoc.version>
+        <instancio.version>5.4.1</instancio.version>
     </properties>
 
     <dependencyManagement>
@@ -86,6 +87,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.instancio</groupId>
+            <artifactId>instancio-core</artifactId>
+            <version>${instancio.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

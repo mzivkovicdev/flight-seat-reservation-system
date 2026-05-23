@@ -1,6 +1,7 @@
 package com.example.flight_seat_reservation_system.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.instancio.Select.field;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -13,12 +14,13 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import org.instancio.Instancio;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.example.flight_seat_reservation_system.dto.CreateBookingRequest;
+import com.example.flight_seat_reservation_system.dto.CreateFlightRequest;
 import com.example.flight_seat_reservation_system.entity.Booking;
 import com.example.flight_seat_reservation_system.entity.BookingStatus;
 import com.example.flight_seat_reservation_system.entity.Flight;
@@ -86,12 +90,13 @@ class FlightReservationIntegrationTest {
 
     @Test
     void shouldCreateAndSearchFlight() throws Exception {
-        Long flightId = createFlight(daysFromNowInOrigin("Europe/Dublin", 2));
+        CreateFlightRequest flightRequest = createFlightRequest(daysFromNowInOrigin("Europe/Dublin", 2));
+        Long flightId = createFlight(flightRequest);
         assertThat(flightId).isNotNull();
 
         MvcResult searchResult = mockMvc.perform(get("/flights")
-                        .param("origin", "DUB")
-                        .param("destination", "BER"))
+                        .param("origin", flightRequest.originAirportCode())
+                        .param("destination", flightRequest.destinationAirportCode()))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -104,9 +109,9 @@ class FlightReservationIntegrationTest {
 
     @Test
     void shouldCreateConfirmAndCancelBooking() throws Exception {
-        Long flightId = createFlight(daysFromNowInOrigin("Europe/Dublin", 2));
+        Long flightId = createFlight(createFlightRequest(daysFromNowInOrigin("Europe/Dublin", 2)));
 
-        MvcResult bookingResult = createBooking(flightId, "1A", "John", "john@example.com", 201);
+        MvcResult bookingResult = createBooking(flightId, createBookingRequest("1A"), 201);
         Long bookingId = json(bookingResult).path("id").asLong();
         assertThat(json(bookingResult).path("status").asText()).isEqualTo("HELD");
 
@@ -124,16 +129,16 @@ class FlightReservationIntegrationTest {
 
     @Test
     void shouldRejectBookingWithinCutoffWindow() throws Exception {
-        Long flightId = createFlight(minutesFromNowInOrigin("Europe/Dublin", 30));
+        Long flightId = createFlight(createFlightRequest(minutesFromNowInOrigin("Europe/Dublin", 30)));
 
-        createBooking(flightId, "1A", "Late User", "late@example.com", 409);
+        createBooking(flightId, createBookingRequest("1A"), 409);
     }
 
     @Test
     void shouldExpireHoldLazilyAndAllowNewBooking() throws Exception {
-        Long flightId = createFlight(daysFromNowInOrigin("Europe/Dublin", 2));
+        Long flightId = createFlight(createFlightRequest(daysFromNowInOrigin("Europe/Dublin", 2)));
 
-        MvcResult first = createBooking(flightId, "1A", "User One", "u1@example.com", 201);
+        MvcResult first = createBooking(flightId, createBookingRequest("1A"), 201);
         Long firstBookingId = json(first).path("id").asLong();
 
         Booking held = bookingRepository.findById(firstBookingId).orElseThrow();
@@ -143,22 +148,22 @@ class FlightReservationIntegrationTest {
         mockMvc.perform(post("/bookings/{id}/confirm", firstBookingId))
                 .andExpect(status().isConflict());
 
-        createBooking(flightId, "1A", "User Two", "u2@example.com", 201);
+        createBooking(flightId, createBookingRequest("1A"), 201);
     }
 
     @Test
     void shouldBlockRemovedFlightFromNewBookings() throws Exception {
-        Long flightId = createFlight(daysFromNowInOrigin("Europe/Dublin", 2));
+        Long flightId = createFlight(createFlightRequest(daysFromNowInOrigin("Europe/Dublin", 2)));
 
         mockMvc.perform(delete("/admin/flights/{id}", flightId))
                 .andExpect(status().isNoContent());
 
-        createBooking(flightId, "1A", "John", "john@example.com", 409);
+        createBooking(flightId, createBookingRequest("1A"), 409);
     }
 
     @Test
     void concurrentBookingShouldHaveExactlyOneSuccess() throws Exception {
-        Long flightId = createFlight(daysFromNowInOrigin("Europe/Dublin", 2));
+        Long flightId = createFlight(createFlightRequest(daysFromNowInOrigin("Europe/Dublin", 2)));
 
         int attempts = 8;
         CountDownLatch ready = new CountDownLatch(attempts);
@@ -167,11 +172,10 @@ class FlightReservationIntegrationTest {
 
         List<Future<Integer>> futures = new ArrayList<>();
         for (int i = 0; i < attempts; i++) {
-            int idx = i;
             futures.add(pool.submit(() -> {
                 ready.countDown();
                 start.await();
-                MvcResult result = createBooking(flightId, "1A", "U" + idx, "u" + idx + "@example.com", -1);
+                MvcResult result = createBooking(flightId, createBookingRequest("1A"), -1);
                 return result.getResponse().getStatus();
             }));
         }
@@ -199,41 +203,45 @@ class FlightReservationIntegrationTest {
 
     @Test
     void shouldEnforcePostgresPartialUniqueIndexForActiveBookings() {
-        Flight flight = new Flight();
-        flight.setFlightNumber("FR200");
-        flight.setOriginAirportCode("DUB");
-        flight.setOriginCity("Dublin");
-        flight.setOriginTimezone("Europe/Dublin");
-        flight.setDestinationAirportCode("BER");
-        flight.setDestinationCity("Berlin");
-        flight.setDestinationTimezone("Europe/Berlin");
+        Flight flight = Instancio.of(Flight.class)
+                .set(field(Flight::getFlightNumber), "FR200")
+                .set(field(Flight::getOriginAirportCode), "DUB")
+                .set(field(Flight::getOriginCity), "Dublin")
+                .set(field(Flight::getOriginTimezone), "Europe/Dublin")
+                .set(field(Flight::getDestinationAirportCode), "BER")
+                .set(field(Flight::getDestinationCity), "Berlin")
+                .set(field(Flight::getDestinationTimezone), "Europe/Berlin")
+                .set(field(Flight::getStatus), FlightStatus.ACTIVE)
+                .create();
         LocalDateTime departureLocal = daysFromNowInOrigin("Europe/Dublin", 3);
         flight.setDepartureTimeLocal(departureLocal);
         flight.setDepartureDateLocal(departureLocal.toLocalDate());
         flight.setDepartureTimeUtc(departureLocal.atZone(ZoneId.of("Europe/Dublin")).toInstant());
-        flight.setStatus(FlightStatus.ACTIVE);
 
-        Seat seat = new Seat();
-        seat.setSeatNumber("1A");
+        Seat seat = Instancio.of(Seat.class)
+                .set(field(Seat::getSeatNumber), "1A")
+                .create();
         flight.addSeat(seat);
 
         flightRepository.saveAndFlush(flight);
 
-        Booking booking1 = new Booking();
-        booking1.setFlight(flight);
-        booking1.setSeat(seat);
-        booking1.setPassengerName("First");
-        booking1.setPassengerEmail("first@example.com");
-        booking1.setStatus(BookingStatus.HELD);
-        booking1.setHoldExpiresAt(java.time.Instant.now().plusSeconds(120));
+        Booking booking1 = Instancio.of(Booking.class)
+                .set(field(Booking::getFlight), flight)
+                .set(field(Booking::getSeat), seat)
+                .set(field(Booking::getPassengerName), "First")
+                .set(field(Booking::getPassengerEmail), "first@example.com")
+                .set(field(Booking::getStatus), BookingStatus.HELD)
+                .set(field(Booking::getHoldExpiresAt), java.time.Instant.now().plusSeconds(120))
+                .create();
         bookingRepository.saveAndFlush(booking1);
 
-        Booking booking2 = new Booking();
-        booking2.setFlight(flight);
-        booking2.setSeat(seat);
-        booking2.setPassengerName("Second");
-        booking2.setPassengerEmail("second@example.com");
-        booking2.setStatus(BookingStatus.CONFIRMED);
+        Booking booking2 = Instancio.of(Booking.class)
+                .set(field(Booking::getFlight), flight)
+                .set(field(Booking::getSeat), seat)
+                .set(field(Booking::getPassengerName), "Second")
+                .set(field(Booking::getPassengerEmail), "second@example.com")
+                .set(field(Booking::getStatus), BookingStatus.CONFIRMED)
+                .create();
 
         boolean raised = false;
         try {
@@ -246,16 +254,8 @@ class FlightReservationIntegrationTest {
     }
 
     private MvcResult createBooking(Long flightId,
-                                    String seatNumber,
-                                    String passengerName,
-                                    String passengerEmail,
+                                    CreateBookingRequest payload,
                                     int expectedStatus) throws Exception {
-        Map<String, Object> payload = Map.of(
-                "seatNumber", seatNumber,
-                "passengerName", passengerName,
-                "passengerEmail", passengerEmail
-        );
-
         var request = mockMvc.perform(post("/flights/{id}/bookings", flightId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)));
@@ -267,19 +267,7 @@ class FlightReservationIntegrationTest {
         return request.andReturn();
     }
 
-    private Long createFlight(LocalDateTime departureLocal) throws Exception {
-        Map<String, Object> payload = Map.of(
-                "flightNumber", "FR100",
-                "originAirportCode", "DUB",
-                "originCity", "Dublin",
-                "originTimezone", "Europe/Dublin",
-                "destinationAirportCode", "BER",
-                "destinationCity", "Berlin",
-                "destinationTimezone", "Europe/Berlin",
-                "departureTimeLocal", departureLocal,
-                "seatCount", 12
-        );
-
+    private Long createFlight(CreateFlightRequest payload) throws Exception {
         MvcResult result = mockMvc.perform(post("/admin/flights")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
@@ -299,5 +287,27 @@ class FlightReservationIntegrationTest {
 
     private LocalDateTime minutesFromNowInOrigin(String timezone, long minutes) {
         return ZonedDateTime.now(ZoneId.of(timezone)).plusMinutes(minutes).withSecond(0).withNano(0).toLocalDateTime();
+    }
+
+    private CreateFlightRequest createFlightRequest(LocalDateTime departureLocal) {
+        return Instancio.of(CreateFlightRequest.class)
+                .set(field(CreateFlightRequest::flightNumber), "FL-" + Instancio.create(Integer.class))
+                .set(field(CreateFlightRequest::originAirportCode), "DUB")
+                .set(field(CreateFlightRequest::originCity), "City-" + Instancio.create(Integer.class))
+                .set(field(CreateFlightRequest::originTimezone), "Europe/Dublin")
+                .set(field(CreateFlightRequest::destinationAirportCode), "BER")
+                .set(field(CreateFlightRequest::destinationCity), "City-" + Instancio.create(Integer.class))
+                .set(field(CreateFlightRequest::destinationTimezone), "Europe/Berlin")
+                .set(field(CreateFlightRequest::departureTimeLocal), departureLocal)
+                .set(field(CreateFlightRequest::seatCount), 12)
+                .create();
+    }
+
+    private CreateBookingRequest createBookingRequest(String seatNumber) {
+        return Instancio.of(CreateBookingRequest.class)
+                .set(field(CreateBookingRequest::seatNumber), seatNumber)
+                .supply(field(CreateBookingRequest::passengerName), () -> "Passenger-" + UUID.randomUUID())
+                .supply(field(CreateBookingRequest::passengerEmail), () -> "user-" + UUID.randomUUID() + "@example.com")
+                .create();
     }
 }

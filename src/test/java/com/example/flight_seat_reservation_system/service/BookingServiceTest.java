@@ -1,5 +1,6 @@
 package com.example.flight_seat_reservation_system.service;
 
+import static org.instancio.Select.field;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -12,7 +13,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
+import org.instancio.Instancio;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,10 +77,12 @@ class BookingServiceTest {
     void shouldCreateHeldBooking() {
         Flight flight = activeFlight();
         Seat seat = seat(flight);
-        Booking saved = new Booking();
-        saved.setStatus(BookingStatus.HELD);
-        BookingResponse mapped = new BookingResponse(1L, 1L, "FR100", "1A", "John", "john@x.com", "HELD", null, null, null,
-                Instant.now());
+        Booking saved = Instancio.of(Booking.class)
+                .set(field(Booking::getStatus), BookingStatus.HELD)
+                .create();
+        BookingResponse mapped = Instancio.of(BookingResponse.class)
+                .set(field(BookingResponse::status), "HELD")
+                .create();
 
         when(flightRepository.findById(1L)).thenReturn(Optional.of(flight));
         when(seatRepository.findByFlightIdAndSeatNumberForUpdate(1L, "1A")).thenReturn(Optional.of(seat));
@@ -88,8 +93,7 @@ class BookingServiceTest {
         when(bookingRepository.saveAndFlush(any(Booking.class))).thenReturn(saved);
         when(bookingMapper.toResponse(saved)).thenReturn(mapped);
 
-        BookingResponse response = bookingService.createBooking(1L,
-                new CreateBookingRequest("1A", "John", "john@x.com"));
+        BookingResponse response = bookingService.createBooking(1L, createBookingRequest());
 
         assertEquals("HELD", response.status());
         verify(bookingWindowValidator).validateBookingAllowed(flight, fixedClock.instant());
@@ -102,7 +106,7 @@ class BookingServiceTest {
         when(flightRepository.findById(1L)).thenReturn(Optional.of(flight));
 
         assertThrows(ConflictException.class,
-                () -> bookingService.createBooking(1L, new CreateBookingRequest("1A", "John", "john@x.com")));
+                () -> bookingService.createBooking(1L, createBookingRequest()));
 
         verify(seatRepository, never()).findByFlightIdAndSeatNumberForUpdate(any(), any());
     }
@@ -111,9 +115,10 @@ class BookingServiceTest {
     void shouldRejectWhenSeatAlreadyHeld() {
         Flight flight = activeFlight();
         Seat seat = seat(flight);
-        Booking activeHold = new Booking();
-        activeHold.setStatus(BookingStatus.HELD);
-        activeHold.setHoldExpiresAt(fixedClock.instant().plusSeconds(60));
+        Booking activeHold = Instancio.of(Booking.class)
+                .set(field(Booking::getStatus), BookingStatus.HELD)
+                .set(field(Booking::getHoldExpiresAt), fixedClock.instant().plusSeconds(60))
+                .create();
 
         when(flightRepository.findById(1L)).thenReturn(Optional.of(flight));
         when(seatRepository.findByFlightIdAndSeatNumberForUpdate(1L, "1A")).thenReturn(Optional.of(seat));
@@ -123,18 +128,20 @@ class BookingServiceTest {
                 .thenReturn(List.of(activeHold));
 
         assertThrows(ConflictException.class,
-                () -> bookingService.createBooking(1L, new CreateBookingRequest("1A", "John", "john@x.com")));
+                () -> bookingService.createBooking(1L, createBookingRequest()));
     }
 
     @Test
     void shouldConfirmHeldBooking() {
         Flight flight = activeFlight();
-        Booking booking = new Booking();
-        booking.setStatus(BookingStatus.HELD);
-        booking.setFlight(flight);
-        booking.setHoldExpiresAt(fixedClock.instant().plusSeconds(60));
-        BookingResponse mapped = new BookingResponse(1L, 1L, "FR100", "1A", "John", "john@x.com", "CONFIRMED", null,
-                fixedClock.instant(), null, fixedClock.instant());
+        Booking booking = Instancio.of(Booking.class)
+                .set(field(Booking::getStatus), BookingStatus.HELD)
+                .set(field(Booking::getFlight), flight)
+                .set(field(Booking::getHoldExpiresAt), fixedClock.instant().plusSeconds(60))
+                .create();
+        BookingResponse mapped = Instancio.of(BookingResponse.class)
+                .set(field(BookingResponse::status), "CONFIRMED")
+                .create();
 
         when(bookingRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(booking));
         when(bookingMapper.toResponse(booking)).thenReturn(mapped);
@@ -148,10 +155,11 @@ class BookingServiceTest {
     @Test
     void shouldFailToConfirmExpiredBooking() {
         Flight flight = activeFlight();
-        Booking booking = new Booking();
-        booking.setStatus(BookingStatus.HELD);
-        booking.setFlight(flight);
-        booking.setHoldExpiresAt(fixedClock.instant().minusSeconds(1));
+        Booking booking = Instancio.of(Booking.class)
+                .set(field(Booking::getStatus), BookingStatus.HELD)
+                .set(field(Booking::getFlight), flight)
+                .set(field(Booking::getHoldExpiresAt), fixedClock.instant().minusSeconds(1))
+                .create();
 
         when(bookingRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(booking));
 
@@ -162,9 +170,10 @@ class BookingServiceTest {
     @Test
     void shouldCancelConfirmedBooking() {
         Flight flight = activeFlight();
-        Booking booking = new Booking();
-        booking.setStatus(BookingStatus.CONFIRMED);
-        booking.setFlight(flight);
+        Booking booking = Instancio.of(Booking.class)
+                .set(field(Booking::getStatus), BookingStatus.CONFIRMED)
+                .set(field(Booking::getFlight), flight)
+                .create();
 
         when(bookingRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(booking));
 
@@ -174,18 +183,26 @@ class BookingServiceTest {
     }
 
     private Flight activeFlight() {
-        Flight flight = new Flight();
-        flight.setId(1L);
-        flight.setFlightNumber("FR100");
-        flight.setStatus(FlightStatus.ACTIVE);
-        return flight;
+        return Instancio.of(Flight.class)
+                .set(field(Flight::getId), 1L)
+                .set(field(Flight::getFlightNumber), "FL-" + Instancio.create(Integer.class))
+                .set(field(Flight::getStatus), FlightStatus.ACTIVE)
+                .create();
     }
 
     private Seat seat(Flight flight) {
-        Seat seat = new Seat();
-        seat.setId(10L);
-        seat.setFlight(flight);
-        seat.setSeatNumber("1A");
-        return seat;
+        return Instancio.of(Seat.class)
+                .set(field(Seat::getId), 10L)
+                .set(field(Seat::getFlight), flight)
+                .set(field(Seat::getSeatNumber), "1A")
+                .create();
+    }
+
+    private CreateBookingRequest createBookingRequest() {
+        return Instancio.of(CreateBookingRequest.class)
+                .set(field(CreateBookingRequest::seatNumber), "1A")
+                .supply(field(CreateBookingRequest::passengerName), () -> "Passenger-" + UUID.randomUUID())
+                .supply(field(CreateBookingRequest::passengerEmail), () -> "user-" + UUID.randomUUID() + "@example.com")
+                .create();
     }
 }

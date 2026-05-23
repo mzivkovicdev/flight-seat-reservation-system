@@ -1,7 +1,10 @@
 package com.example.flight_seat_reservation_system.mapper;
 
+import static org.instancio.Select.field;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
@@ -16,26 +19,32 @@ class BookingMapperTest {
 
     @Test
     void shouldMapNestedFields() {
-        Flight flight = new Flight();
-        flight.setId(7L);
-        flight.setFlightNumber("LH500");
+        Long flightId = Instancio.create(Long.class);
+        String flightNumber = "FL-" + Instancio.create(Integer.class);
+        String seatNumber = "2C";
+        BookingStatus status = BookingStatus.HELD;
 
-        Seat seat = new Seat();
-        seat.setSeatNumber("2C");
+        Flight flight = Instancio.of(Flight.class)
+                .set(field(Flight::getId), flightId)
+                .set(field(Flight::getFlightNumber), flightNumber)
+                .create();
 
-        Booking booking = new Booking();
-        booking.setId(11L);
-        booking.setFlight(flight);
-        booking.setSeat(seat);
-        booking.setPassengerName("Ana");
-        booking.setPassengerEmail("ana@example.com");
-        booking.setStatus(BookingStatus.HELD);
+        Seat seat = Instancio.of(Seat.class)
+                .set(field(Seat::getSeatNumber), seatNumber)
+                .create();
+
+        Booking booking = Instancio.of(Booking.class)
+                .set(field(Booking::getFlight), flight)
+                .set(field(Booking::getSeat), seat)
+                .set(field(Booking::getStatus), status)
+                .create();
 
         var response = mapper.toResponse(booking);
 
-        assertEquals(7L, response.flightId());
-        assertEquals("LH500", response.flightNumber());
-        assertEquals("2C", response.seatNumber());
-        assertEquals("HELD", response.status());
+        assertNotNull(response);
+        assertEquals(flightId, response.flightId());
+        assertEquals(flightNumber, response.flightNumber());
+        assertEquals(seatNumber, response.seatNumber());
+        assertEquals(status.name(), response.status());
     }
 }
