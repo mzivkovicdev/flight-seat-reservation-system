@@ -2,6 +2,9 @@ package com.example.flight_seat_reservation_system.api;
 
 import java.time.LocalDate;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,8 +20,6 @@ import com.example.flight_seat_reservation_system.dto.FlightSearchResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
 
 @Validated
 @RequestMapping

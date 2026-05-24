@@ -1,5 +1,7 @@
 package com.example.flight_seat_reservation_system.api;
 
+import jakarta.validation.constraints.Positive;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,7 +13,6 @@ import com.example.flight_seat_reservation_system.dto.BookingResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.Positive;
 
 @Validated
 @RequestMapping
