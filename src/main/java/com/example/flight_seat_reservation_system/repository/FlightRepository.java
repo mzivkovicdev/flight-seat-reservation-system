@@ -42,16 +42,14 @@ public interface FlightRepository extends JpaRepository<Flight, Long> {
                     )
                 )
             WHERE f.status = com.example.flight_seat_reservation_system.entity.FlightStatus.ACTIVE
-              AND (:date IS NULL OR f.departureDateLocal = :date)
+              AND f.departureDateLocal = COALESCE(:date, f.departureDateLocal)
               AND (
-                    :origin IS NULL
-                    OR LOWER(f.originAirportCode) = LOWER(:origin)
-                    OR LOWER(f.originCity) LIKE LOWER(CONCAT('%', :origin, '%'))
+                    LOWER(f.originAirportCode) = LOWER(COALESCE(:origin, f.originAirportCode))
+                    OR LOWER(f.originCity) LIKE LOWER(CONCAT('%', COALESCE(:origin, ''), '%'))
               )
               AND (
-                    :destination IS NULL
-                    OR LOWER(f.destinationAirportCode) = LOWER(:destination)
-                    OR LOWER(f.destinationCity) LIKE LOWER(CONCAT('%', :destination, '%'))
+                    LOWER(f.destinationAirportCode) = LOWER(COALESCE(:destination, f.destinationAirportCode))
+                    OR LOWER(f.destinationCity) LIKE LOWER(CONCAT('%', COALESCE(:destination, ''), '%'))
               )
             GROUP BY f.id
             ORDER BY f.departureTimeUtc ASC
