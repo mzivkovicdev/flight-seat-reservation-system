@@ -108,17 +108,6 @@ Two layers are used:
 
 If a race still hits a DB constraint, `DataIntegrityViolationException` is translated to HTTP `409 Conflict`.
 
-## N+1 Avoidance
-`GET /flights` uses projection query with joins and aggregated counts (`totalSeats`, `availableSeats`) so flight availability is computed in SQL rather than loading object graphs per flight.
-
-## MapStruct Usage
-MapStruct is the default mapper approach:
-- `CreateFlightMapper`
-- `FlightMapper`
-- `BookingMapper`
-
-No manual mapper classes are used.
-
 ## OpenAPI Approach
 For this take-home scope, controller interfaces (`FlightsApi`, `BookingsApi`, `AdminFlightsApi`) are used to keep an OpenAPI-first-compatible structure without full spec-first code generation complexity.
 
